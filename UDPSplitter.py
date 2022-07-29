@@ -1,3 +1,7 @@
+"""
+Simple script to listen to one udp port and relay messages to multiple other
+ports. Made primarily for splitting VRChat OSC message streams.
+"""
 import socket
 import sys
 import time
@@ -6,10 +10,18 @@ from queue import Queue
 
 UDP_IP = "127.0.0.1"
 
-message_queue = Queue()
 
-# generate work
 def receiver(queue, port):
+    """
+    Receiver thread. Receives messages on the specified port and adds them to
+    the message queue.
+
+    Args:
+        queue (queue.Queue):
+            A queue of byte arrays read from receiver
+        port (int):
+            Port to listen to for messages to rebroadcast
+    """
     while True:
         try:
             sock = socket.socket(socket.AF_INET, # Internet
@@ -22,16 +34,25 @@ def receiver(queue, port):
                 data, _ = sock.recvfrom(1024) # buffer size is 1024 bytes
                 queue.put(data)
         except:
-            raise
+            pass
         finally:
             try:
                 sock.close()
             except:
                 pass
 
- 
-# consume work
+
 def rebroadcast(queue, *ports):
+    """
+    Rebroadcast thread. Consumes messages from the thread and rebroadcasts them
+    on the specified ports.
+
+    Args:
+        queue (queue.Queue):
+            A queue of byte arrays read from receiver
+        ports (Iterable of int):
+            A list of ports
+    """
     while True:
         try:
             sock = socket.socket(socket.AF_INET, # Internet
@@ -46,7 +67,7 @@ def rebroadcast(queue, *ports):
                 else:
                     time.sleep(0.1)
         except:
-            raise
+            pass
         finally:
             try:
                 sock.close()
@@ -54,10 +75,9 @@ def rebroadcast(queue, *ports):
                 pass
 
 if __name__ == "__main__":
-    print(sys.argv)
     port = int(sys.argv[1])
     ports = [int(s) for s in sys.argv[2:]]
-    print(f"{port} {ports}")
+    message_queue = Queue()
 
     receiverThread = threading.Thread(target=receiver, args=[message_queue, port])  # <- 1 element list
     receiverThread.start()
@@ -67,27 +87,3 @@ if __name__ == "__main__":
 
     receiverThread.join()
     senderThread.join()
-
-    """
-    UDP_IP = "127.0.0.1"
-    UDP_PORT = 9000
-    MESSAGE = "Hello, World!"
-
-    print("UDP target IP: %s" % UDP_IP)
-    print("UDP target port: %s" % UDP_PORT)
-    print("message: %s" % MESSAGE)
-
-    receive_socks = {}
-    for port in ports:
-        testsock = socket.socket(socket.AF_INET,
-                                socket.SOCK_DGRAM)
-        testsock.bind((UDP_IP, port))
-        receive_socks[port] = testsock
-
-    sock = socket.socket(socket.AF_INET, # Internet
-                        socket.SOCK_DGRAM) # UDP
-    sock.sendto(MESSAGE.encode(), (UDP_IP, UDP_PORT))
-    
-    for port, sock in receive_socks.items():
-        print(f"{port} - {sock.recvfrom(1024)}")
-    """
